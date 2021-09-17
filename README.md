@@ -52,6 +52,8 @@
 * filled area with alpha in selection
 * filled area with alpha in circle
 
+... added a `Dockerfile` and a build-script `build.sh` to build without installing dependencies
+
 ## Preview
 
 ![image](https://github.com/flameshot-org/flameshot-org.github.io/blob/master/docs/media/animatedUsage.gif)

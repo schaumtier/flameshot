@@ -4,10 +4,6 @@
 #include "selectiontool.h"
 #include <QPainter>
 
-namespace {
-#define PADDING_VALUE 2
-}
-
 SelectionTool::SelectionTool(QObject* parent)
   : AbstractTwoPointTool(parent)
 {
@@ -21,7 +17,7 @@ bool SelectionTool::closeOnButtonPressed() const
 
 QIcon SelectionTool::icon(const QColor& background, bool inEditor) const
 {
-    Q_UNUSED(inEditor);
+    Q_UNUSED(inEditor)
     return QIcon(iconPath(background) + "square-outline.svg");
 }
 QString SelectionTool::name() const
@@ -29,7 +25,7 @@ QString SelectionTool::name() const
     return tr("Rectangular Selection");
 }
 
-ToolType SelectionTool::nameID() const
+ToolType SelectionTool::type() const
 {
     return ToolType::SELECTION;
 }
@@ -41,50 +37,34 @@ QString SelectionTool::description() const
 
 CaptureTool* SelectionTool::copy(QObject* parent)
 {
-    return new SelectionTool(parent);
+    SelectionTool* tool = new SelectionTool(parent);
+    copyParams(this, tool);
+    return tool;
 }
 
-void SelectionTool::process(QPainter& painter,
-                            const QPixmap& pixmap,
-                            bool recordUndo)
+void SelectionTool::process(QPainter& painter, const QPixmap& pixmap)
 {
-    if (recordUndo) {
-        updateBackup(pixmap);
-    }
-    // ++ ORIGINAL ++
-    // painter.setPen(QPen(m_color, m_thickness));
-    // painter.drawRect(QRect(m_points.first, m_points.second));
+    Q_UNUSED(pixmap)
+    //painter.setPen(
+    //  QPen(color(), thickness(), Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
+    //painter.drawRect(QRect(points().first, points().second));
 
     // ++ Fill with Alpha ++
-    m_color.setAlpha(100);
+    QColor borderColor = QColor(color());
+    borderColor.setAlpha(100);
 
-    QColor fillColor = QColor(m_color);
+    QColor fillColor = QColor(color());
     fillColor.setAlpha(20);
 
     QPainterPath path;
-    path.addRoundedRect(QRect(m_points.first, m_points.second), 4, 4);
-    QPen pen(m_color, m_thickness);
+    path.addRoundedRect(QRect(points().first, points().second), 4, 4);
+    QPen pen(borderColor, thickness());
     painter.setPen(pen);
     painter.fillPath(path, fillColor);
-    painter.drawPath(path);
-}
-
-void SelectionTool::paintMousePreview(QPainter& painter,
-                                      const CaptureContext& context)
-{
-    painter.setPen(QPen(context.color, context.thickness));
-    painter.drawLine(context.mousePos, context.mousePos);
-}
-
-void SelectionTool::drawStart(const CaptureContext& context)
-{
-    m_color = context.color;
-    m_thickness = context.thickness + PADDING_VALUE;
-    m_points.first = context.mousePos;
-    m_points.second = context.mousePos;
+    painter.drawPath(path);    
 }
 
 void SelectionTool::pressed(const CaptureContext& context)
 {
-    Q_UNUSED(context);
+    Q_UNUSED(context)
 }
