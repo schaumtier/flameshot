@@ -45,6 +45,12 @@
 </div>
 
 
+## About This Fork
+
+... contains just some personal changes like
+* rounded corners on selection
+* filled area with alpha in selection
+* filled area with alpha in circle
 
 ## Preview
 
