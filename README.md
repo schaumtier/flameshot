@@ -47,12 +47,12 @@
 
 ## About This Fork
 
-... contains just some personal changes like
+... contains some personal changes like
 * rounded corners on selection
 * filled area with alpha in selection
 * filled area with alpha in circle
 
-... added a `Dockerfile` and a build-script `build.sh` to build without installing dependencies
+... added a `Dockerfile` and a build-script `build.sh` to build without installing dependencies (currently works only on Linux)
 
 ## Preview
 
