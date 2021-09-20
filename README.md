@@ -51,6 +51,7 @@
 * rounded corners on selection
 * filled area with alpha in selection
 * filled area with alpha in circle
+* on "Choose an app to open the capture" directly open "eog" instead of choosing an app
 
 ... added a `Dockerfile` and a build-script `build.sh` to build without installing dependencies (currently works only on Linux)
 

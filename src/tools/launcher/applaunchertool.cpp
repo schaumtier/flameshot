@@ -4,6 +4,11 @@
 #include "applaunchertool.h"
 #include "applauncherwidget.h"
 
+#include "src/utils/filenamehandler.h"
+#include <QMessageBox>
+#include <QDir>
+#include <QProcess>
+
 AppLauncher::AppLauncher(QObject* parent)
   : AbstractActionTool(parent)
 {}
@@ -47,5 +52,14 @@ void AppLauncher::pressed(const CaptureContext& context)
 {
     capture = context.selectedScreenshotArea();
     emit requestAction(REQ_CAPTURE_DONE_OK);
-    emit requestAction(REQ_ADD_EXTERNAL_WIDGETS);
+    // emit requestAction(REQ_ADD_EXTERNAL_WIDGETS);
+
+    QString m_tempFile;
+    if (!QFileInfo(m_tempFile).isReadable()) {
+        m_tempFile =
+          FileNameHandler().properScreenshotPath(QDir::tempPath(), "png");
+        capture.save(m_tempFile);
+    }
+    
+    QProcess::startDetached("eog", { m_tempFile });
 }
