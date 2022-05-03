@@ -5,6 +5,8 @@
 #include "capturetool.h"
 #include "setshortcutwidget.h"
 #include "src/core/qguiappcurrentscreen.h"
+#include "src/utils/globalvalues.h"
+#include "toolfactory.h"
 #include <QHeaderView>
 #include <QIcon>
 #include <QKeyEvent>
@@ -24,7 +26,7 @@ ShortcutsWidget::ShortcutsWidget(QWidget* parent)
   : QWidget(parent)
 {
     setAttribute(Qt::WA_DeleteOnClose);
-    setWindowIcon(QIcon(":img/app/flameshot.svg"));
+    setWindowIcon(QIcon(GlobalValues::iconPath()));
     setWindowTitle(tr("Hot Keys"));
 
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
@@ -37,14 +39,12 @@ ShortcutsWidget::ShortcutsWidget(QWidget* parent)
     m_layout = new QVBoxLayout(this);
     m_layout->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
 
-    initShortcuts();
     initInfoTable();
+    connect(ConfigHandler::getInstance(),
+            &ConfigHandler::fileChanged,
+            this,
+            &ShortcutsWidget::populateInfoTable);
     show();
-}
-
-const QList<QStringList>& ShortcutsWidget::shortcuts()
-{
-    return m_shortcuts;
 }
 
 void ShortcutsWidget::initInfoTable()
@@ -55,7 +55,6 @@ void ShortcutsWidget::initInfoTable()
     m_layout->addWidget(m_table);
 
     m_table->setColumnCount(2);
-    m_table->setRowCount(m_shortcuts.size());
     m_table->setSelectionMode(QAbstractItemView::NoSelection);
     m_table->setFocusPolicy(Qt::NoFocus);
     m_table->verticalHeader()->hide();
@@ -65,24 +64,37 @@ void ShortcutsWidget::initInfoTable()
     names << tr("Description") << tr("Key");
     m_table->setHorizontalHeaderLabels(names);
     connect(m_table,
-            SIGNAL(cellClicked(int, int)),
+            &QTableWidget::cellClicked,
             this,
-            SLOT(slotShortcutCellClicked(int, int)));
+            &ShortcutsWidget::onShortcutCellClicked);
+
+    // populate with dynamic data
+    populateInfoTable();
+
+    // adjust size
+    m_table->horizontalHeader()->setMinimumSectionSize(200);
+    m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    m_table->horizontalHeader()->setSizePolicy(QSizePolicy::Expanding,
+                                               QSizePolicy::Expanding);
+    m_table->resizeColumnsToContents();
+    m_table->resizeRowsToContents();
+}
+
+void ShortcutsWidget::populateInfoTable()
+{
+    loadShortcuts();
+    m_table->setRowCount(m_shortcuts.size());
 
     // add content
-    for (int i = 0; i < shortcuts().size(); ++i) {
+    for (int i = 0; i < m_shortcuts.size(); ++i) {
         const auto current_shortcut = m_shortcuts.at(i);
         const auto identifier = current_shortcut.at(0);
         const auto description = current_shortcut.at(1);
-        const auto default_key_sequence = current_shortcut.at(2);
+        const auto key_sequence = current_shortcut.at(2);
         m_table->setItem(i, 0, new QTableWidgetItem(description));
 
-        const auto key_sequence = identifier.isEmpty()
-                                    ? default_key_sequence
-                                    : m_config.shortcut(identifier);
 #if defined(Q_OS_MACOS)
-        QTableWidgetItem* item =
-          new QTableWidgetItem(nativeOSHotKeyText(key_sequence));
+        auto* item = new QTableWidgetItem(nativeOSHotKeyText(key_sequence));
 #else
         QTableWidgetItem* item = new QTableWidgetItem(key_sequence);
 #endif
@@ -105,17 +117,9 @@ void ShortcutsWidget::initInfoTable()
             item->setFlags(item->flags() ^ Qt::ItemIsEditable);
         }
     }
-
-    // adjust size
-    m_table->resizeColumnsToContents();
-    m_table->resizeRowsToContents();
-    m_table->horizontalHeader()->setMinimumSectionSize(200);
-    m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
-    m_table->horizontalHeader()->setSizePolicy(QSizePolicy::Expanding,
-                                               QSizePolicy::Expanding);
 }
 
-void ShortcutsWidget::slotShortcutCellClicked(int row, int col)
+void ShortcutsWidget::onShortcutCellClicked(int row, int col)
 {
     if (col == 1) {
         // Ignore non-changable shortcuts
@@ -124,9 +128,9 @@ void ShortcutsWidget::slotShortcutCellClicked(int row, int col)
             return;
         }
 
-        SetShortcutDialog* setShortcutDialog = new SetShortcutDialog();
+        QString shortcutName = m_shortcuts.at(row).at(0);
+        auto* setShortcutDialog = new SetShortcutDialog(nullptr, shortcutName);
         if (0 != setShortcutDialog->exec()) {
-            QString shortcutName = m_shortcuts.at(row).at(0);
             QKeySequence shortcutValue = setShortcutDialog->shortcut();
 
             // set no shortcut is Backspace
@@ -139,36 +143,31 @@ void ShortcutsWidget::slotShortcutCellClicked(int row, int col)
                 shortcutValue = QKeySequence("");
             }
 #endif
-
             if (m_config.setShortcut(shortcutName, shortcutValue.toString())) {
-#if defined(Q_OS_MACOS)
-                QTableWidgetItem* item = new QTableWidgetItem(
-                  nativeOSHotKeyText(shortcutValue.toString()));
-#else
-                QTableWidgetItem* item =
-                  new QTableWidgetItem(shortcutValue.toString());
-#endif
-                item->setTextAlignment(Qt::AlignCenter);
-                item->setFlags(item->flags() ^ Qt::ItemIsEditable);
-                m_table->setItem(row, col, item);
+                populateInfoTable();
             }
         }
         delete setShortcutDialog;
     }
 }
 
-void ShortcutsWidget::initShortcuts()
+void ShortcutsWidget::loadShortcuts()
 {
-    auto buttons = CaptureToolButton::getIterableButtonTypes();
+    m_shortcuts.clear();
+    auto buttonTypes = CaptureToolButton::getIterableButtonTypes();
 
     // get shortcuts names from capture buttons
-    for (const CaptureToolButton::ButtonType& t : buttons) {
-        CaptureToolButton* b = new CaptureToolButton(t, nullptr);
+    for (const CaptureTool::Type& t : buttonTypes) {
+        CaptureTool* tool = ToolFactory().CreateTool(t);
         QString shortcutName = QVariant::fromValue(t).toString();
-        if (shortcutName != "TYPE_IMAGEUPLOADER") {
-            appendShortcut(shortcutName, b->tool()->description());
+        appendShortcut(shortcutName, tool->description());
+        if (shortcutName == "TYPE_COPY") {
+            if (m_config.copyOnDoubleClick()) {
+                m_shortcuts << (QStringList() << "" << tool->description()
+                                              << "Left Double-click");
+            }
         }
-        delete b;
+        delete tool;
     }
 
     // additional tools that don't have their own buttons
@@ -192,10 +191,8 @@ void ShortcutsWidget::initShortcuts()
 
     // Global hotkeys
 #if defined(Q_OS_MACOS)
-    m_shortcuts << (QStringList()
-                    << "" << QObject::tr("Screenshot history") << "⇧⌘⌥H");
-    m_shortcuts << (QStringList()
-                    << "" << QObject::tr("Capture screen") << "⇧⌘⌥4");
+    appendShortcut("TAKE_SCREENSHOT", "Capture screen");
+    appendShortcut("SCREENSHOT_HISTORY", "Screenshot history");
 #elif defined(Q_OS_WIN)
     m_shortcuts << (QStringList() << "" << QObject::tr("Screenshot history")
                                   << "Shift+Print Screen");
@@ -208,18 +205,18 @@ void ShortcutsWidget::initShortcuts()
 #endif
     m_shortcuts << (QStringList()
                     << "" << QObject::tr("Show color picker") << "Right Click");
-    m_shortcuts << (QStringList()
-                    << "" << QObject::tr("Change the tool's thickness")
-                    << "Mouse Wheel");
+    m_shortcuts << (QStringList() << "" << QObject::tr("Change the tool's size")
+                                  << "Mouse Wheel");
 }
 
 void ShortcutsWidget::appendShortcut(const QString& shortcutName,
                                      const QString& description)
 {
+    QString shortcut = ConfigHandler().shortcut(shortcutName);
     m_shortcuts << (QStringList()
                     << shortcutName
                     << QObject::tr(description.toStdString().c_str())
-                    << ConfigHandler().shortcut(shortcutName));
+                    << shortcut.replace("Return", "Enter"));
 }
 
 #if defined(Q_OS_MACOS)

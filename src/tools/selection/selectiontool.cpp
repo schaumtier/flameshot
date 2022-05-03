@@ -25,9 +25,9 @@ QString SelectionTool::name() const
     return tr("Rectangular Selection");
 }
 
-ToolType SelectionTool::type() const
+CaptureTool::Type SelectionTool::type() const
 {
-    return ToolType::SELECTION;
+    return CaptureTool::TYPE_SELECTION;
 }
 
 QString SelectionTool::description() const
@@ -37,7 +37,7 @@ QString SelectionTool::description() const
 
 CaptureTool* SelectionTool::copy(QObject* parent)
 {
-    SelectionTool* tool = new SelectionTool(parent);
+    auto* tool = new SelectionTool(parent);
     copyParams(this, tool);
     return tool;
 }
@@ -45,9 +45,9 @@ CaptureTool* SelectionTool::copy(QObject* parent)
 void SelectionTool::process(QPainter& painter, const QPixmap& pixmap)
 {
     Q_UNUSED(pixmap)
-    //painter.setPen(
-    //  QPen(color(), thickness(), Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
-    //painter.drawRect(QRect(points().first, points().second));
+    // painter.setPen(
+    //   QPen(color(), size(), Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
+    // painter.drawRect(QRect(points().first, points().second));
 
     // ++ Fill with Alpha ++
     QColor borderColor = QColor(color());
@@ -58,13 +58,13 @@ void SelectionTool::process(QPainter& painter, const QPixmap& pixmap)
 
     QPainterPath path;
     path.addRoundedRect(QRect(points().first, points().second), 4, 4);
-    QPen pen(borderColor, thickness());
+    QPen pen(borderColor, size());
     painter.setPen(pen);
     painter.fillPath(path, fillColor);
     painter.drawPath(path);    
 }
 
-void SelectionTool::pressed(const CaptureContext& context)
+void SelectionTool::pressed(CaptureContext& context)
 {
     Q_UNUSED(context)
 }

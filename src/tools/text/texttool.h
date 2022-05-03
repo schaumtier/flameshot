@@ -4,9 +4,9 @@
 #pragma once
 
 #include "src/tools/capturetool.h"
+#include "textconfig.h"
 #include <QPoint>
 #include <QPointer>
-
 class TextWidget;
 class TextConfig;
 
@@ -15,16 +15,18 @@ class TextTool : public CaptureTool
     Q_OBJECT
 public:
     explicit TextTool(QObject* parent = nullptr);
-    ~TextTool();
+    ~TextTool() override;
 
-    bool isValid() const override;
-    bool closeOnButtonPressed() const override;
-    bool isSelectable() const override;
-    bool showMousePreview() const override;
+    [[nodiscard]] bool isValid() const override;
+    [[nodiscard]] bool closeOnButtonPressed() const override;
+    [[nodiscard]] bool isSelectable() const override;
+    [[nodiscard]] bool showMousePreview() const override;
+    [[nodiscard]] QRect boundingRect() const override;
 
-    QIcon icon(const QColor& background, bool inEditor) const override;
-    QString name() const override;
-    QString description() const override;
+    [[nodiscard]] QIcon icon(const QColor& background,
+                             bool inEditor) const override;
+    [[nodiscard]] QString name() const override;
+    [[nodiscard]] QString description() const override;
     QString info() override;
 
     QWidget* widget() override;
@@ -38,34 +40,36 @@ public:
     const QPoint* pos() override;
     void drawObjectSelection(QPainter& painter) override;
 
-    void setEditMode(bool b) override;
+    void setEditMode(bool editMode) override;
     bool isChanged() override;
 
 protected:
     void copyParams(const TextTool* from, TextTool* to);
-    ToolType type() const override;
+    [[nodiscard]] CaptureTool::Type type() const override;
 
 public slots:
-    void drawEnd(const QPoint& p) override;
-    void drawMove(const QPoint& p) override;
+    void drawEnd(const QPoint& point) override;
+    void drawMove(const QPoint& point) override;
     void drawStart(const CaptureContext& context) override;
-    void pressed(const CaptureContext& context) override;
-    void colorChanged(const QColor& c) override;
-    void thicknessChanged(int th) override;
-    virtual int thickness() override { return m_size; };
+    void pressed(CaptureContext& context) override;
+    void onColorChanged(const QColor& color) override;
+    void onSizeChanged(int size) override;
+    int size() const override { return m_size; };
 
 private slots:
-    void updateText(const QString& s);
-    void updateFamily(const QString& s);
-    void updateFontUnderline(const bool underlined);
-    void updateFontStrikeOut(const bool s);
-    void updateFontWeight(const QFont::Weight w);
-    void updateFontItalic(const bool italic);
+    void updateText(const QString& string);
+    void updateFamily(const QString& string);
+    void updateFontUnderline(bool underlined);
+    void updateFontStrikeOut(bool strikeout);
+    void updateFontWeight(QFont::Weight weight);
+    void updateFontItalic(bool italic);
+    void updateAlignment(Qt::AlignmentFlag alignment);
 
 private:
     void closeEditor();
 
     QFont m_font;
+    Qt::AlignmentFlag m_alignment;
     QString m_text;
     QString m_textOld;
     int m_size;

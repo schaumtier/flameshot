@@ -25,8 +25,9 @@ ButtonHandler::ButtonHandler(QObject* parent)
 
 void ButtonHandler::hide()
 {
-    for (CaptureToolButton* b : m_vectorButtons)
+    for (CaptureToolButton* b : m_vectorButtons) {
         b->hide();
+    }
 }
 
 void ButtonHandler::show()
@@ -34,8 +35,9 @@ void ButtonHandler::show()
     if (m_vectorButtons.isEmpty() || m_vectorButtons.first()->isVisible()) {
         return;
     }
-    for (CaptureToolButton* b : m_vectorButtons)
+    for (CaptureToolButton* b : m_vectorButtons) {
         b->animatedShow();
+    }
 }
 
 bool ButtonHandler::isVisible() const
@@ -164,6 +166,21 @@ void ButtonHandler::updatePosition(const QRect& selection)
     }
 }
 
+int ButtonHandler::calculateShift(int elements, bool reverse) const
+{
+    int shift = 0;
+    if (elements % 2 == 0) {
+        shift = m_buttonExtendedSize * (elements / 2) - (m_separator / 2);
+    } else {
+        shift =
+          m_buttonExtendedSize * ((elements - 1) / 2) + m_buttonBaseSize / 2;
+    }
+    if (!reverse) {
+        shift -= m_buttonBaseSize;
+    }
+
+    return shift;
+}
 // horizontalPoints is an auxiliary method for the button position computation.
 // starts from a known center and keeps adding elements horizontally
 // and returns the computed positions.
@@ -173,16 +190,8 @@ QVector<QPoint> ButtonHandler::horizontalPoints(const QPoint& center,
 {
     QVector<QPoint> res;
     // Distance from the center to start adding buttons
-    int shift = 0;
-    if (elements % 2 == 0) {
-        shift = m_buttonExtendedSize * (elements / 2) - (m_separator / 2);
-    } else {
-        shift =
-          m_buttonExtendedSize * ((elements - 1) / 2) + m_buttonBaseSize / 2;
-    }
-    if (!leftToRight) {
-        shift -= m_buttonBaseSize;
-    }
+    int shift = calculateShift(elements, leftToRight);
+
     int x = leftToRight ? center.x() - shift : center.x() + shift;
     QPoint i(x, center.y());
     while (elements > res.length()) {
@@ -202,16 +211,8 @@ QVector<QPoint> ButtonHandler::verticalPoints(const QPoint& center,
 {
     QVector<QPoint> res;
     // Distance from the center to start adding buttons
-    int shift = 0;
-    if (elements % 2 == 0) {
-        shift = m_buttonExtendedSize * (elements / 2) - (m_separator / 2);
-    } else {
-        shift =
-          m_buttonExtendedSize * ((elements - 1) / 2) + m_buttonBaseSize / 2;
-    }
-    if (!upToDown) {
-        shift -= m_buttonBaseSize;
-    }
+    int shift = calculateShift(elements, upToDown);
+
     int y = upToDown ? center.y() - shift : center.y() + shift;
     QPoint i(center.x(), y);
     while (elements > res.length()) {
@@ -336,7 +337,7 @@ void ButtonHandler::moveButtonsToPoints(const QVector<QPoint>& points,
                                         int& index)
 {
     for (const QPoint& p : points) {
-        auto button = m_vectorButtons[index];
+        auto* button = m_vectorButtons[index];
         button->move(p);
         ++index;
     }
@@ -354,11 +355,13 @@ void ButtonHandler::adjustHorizontalCenter(QPoint& center)
 // setButtons redefines the buttons of the button handler
 void ButtonHandler::setButtons(const QVector<CaptureToolButton*> v)
 {
-    if (v.isEmpty())
+    if (v.isEmpty()) {
         return;
+    }
 
-    for (CaptureToolButton* b : m_vectorButtons)
+    for (CaptureToolButton* b : m_vectorButtons) {
         delete (b);
+    }
     m_vectorButtons = v;
     m_buttonBaseSize = GlobalValues::buttonBaseSize();
     m_buttonExtendedSize = m_buttonBaseSize + m_separator;

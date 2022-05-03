@@ -20,9 +20,9 @@ QString CircleTool::name() const
     return tr("Circle");
 }
 
-ToolType CircleTool::type() const
+CaptureTool::Type CircleTool::type() const
 {
-    return ToolType::CIRCLE;
+    return CaptureTool::TYPE_CIRCLE;
 }
 
 QString CircleTool::description() const
@@ -40,8 +40,8 @@ CaptureTool* CircleTool::copy(QObject* parent)
 void CircleTool::process(QPainter& painter, const QPixmap& pixmap)
 {
     Q_UNUSED(pixmap)
-    //painter.setPen(QPen(color(), thickness()));
-    //painter.drawEllipse(QRect(points().first, points().second));
+    // painter.setPen(QPen(color(), size()));
+    // painter.drawEllipse(QRect(points().first, points().second));
 
     // ++ Fill with Alpha ++
     QColor borderColor = QColor(color());
@@ -52,13 +52,13 @@ void CircleTool::process(QPainter& painter, const QPixmap& pixmap)
 
     QPainterPath path;
     path.addEllipse(QRect(points().first, points().second));
-    QPen pen(borderColor, thickness());
+    QPen pen(borderColor, size());
     painter.setPen(pen);
     painter.fillPath(path, fillColor);
     painter.drawPath(path);
 }
 
-void CircleTool::pressed(const CaptureContext& context)
+void CircleTool::pressed(CaptureContext& context)
 {
     Q_UNUSED(context)
 }

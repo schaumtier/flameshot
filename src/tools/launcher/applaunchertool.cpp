@@ -28,9 +28,9 @@ QString AppLauncher::name() const
     return tr("App Launcher");
 }
 
-ToolType AppLauncher::type() const
+CaptureTool::Type AppLauncher::type() const
 {
-    return ToolType::LAUNCHER;
+    return CaptureTool::TYPE_OPEN_APP;
 }
 
 QString AppLauncher::description() const
@@ -48,11 +48,12 @@ CaptureTool* AppLauncher::copy(QObject* parent)
     return new AppLauncher(parent);
 }
 
-void AppLauncher::pressed(const CaptureContext& context)
+void AppLauncher::pressed(CaptureContext& context)
 {
     capture = context.selectedScreenshotArea();
     emit requestAction(REQ_CAPTURE_DONE_OK);
     // emit requestAction(REQ_ADD_EXTERNAL_WIDGETS);
+    // emit requestAction(REQ_CLOSE_GUI);
 
     QString m_tempFile;
     if (!QFileInfo(m_tempFile).isReadable()) {

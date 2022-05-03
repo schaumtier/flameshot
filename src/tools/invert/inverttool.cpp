@@ -25,14 +25,19 @@ QString InvertTool::name() const
     return tr("Invert");
 }
 
-ToolType InvertTool::type() const
+CaptureTool::Type InvertTool::type() const
 {
-    return ToolType::INVERT;
+    return CaptureTool::TYPE_INVERT;
 }
 
 QString InvertTool::description() const
 {
     return tr("Set Inverter as the paint tool");
+}
+
+QRect InvertTool::boundingRect() const
+{
+    return QRect(points().first, points().second).normalized();
 }
 
 CaptureTool* InvertTool::copy(QObject* parent)
@@ -44,12 +49,13 @@ CaptureTool* InvertTool::copy(QObject* parent)
 
 void InvertTool::process(QPainter& painter, const QPixmap& pixmap)
 {
-    QPoint p0 = points().first;
-    QPoint p1 = points().second;
-    QRect selection = QRect(p0, p1).normalized();
+    QRect selection = boundingRect().intersected(pixmap.rect());
+    auto pixelRatio = pixmap.devicePixelRatio();
+    QRect selectionScaled = QRect(selection.topLeft() * pixelRatio,
+                                  selection.bottomRight() * pixelRatio);
 
     // Invert selection
-    QPixmap inv = pixmap.copy(selection);
+    QPixmap inv = pixmap.copy(selectionScaled);
     QImage img = inv.toImage();
     img.invertPixels();
 
@@ -59,11 +65,7 @@ void InvertTool::process(QPainter& painter, const QPixmap& pixmap)
 void InvertTool::drawSearchArea(QPainter& painter, const QPixmap& pixmap)
 {
     Q_UNUSED(pixmap)
-    painter.fillRect(std::min(points().first.x(), points().second.x()),
-                     std::min(points().first.y(), points().second.y()),
-                     std::abs(points().first.x() - points().second.x()),
-                     std::abs(points().first.y() - points().second.y()),
-                     QBrush(Qt::black));
+    painter.fillRect(boundingRect(), QBrush(Qt::black));
 }
 
 void InvertTool::paintMousePreview(QPainter& painter,
@@ -73,16 +75,7 @@ void InvertTool::paintMousePreview(QPainter& painter,
     Q_UNUSED(painter)
 }
 
-void InvertTool::pressed(const CaptureContext& context)
+void InvertTool::pressed(CaptureContext& context)
 {
     Q_UNUSED(context)
-}
-
-void InvertTool::drawObjectSelection(QPainter& painter)
-{
-    QRect rect = QRect(std::min(points().first.x(), points().second.x()),
-                       std::min(points().first.y(), points().second.y()),
-                       std::abs(points().first.x() - points().second.x()),
-                       std::abs(points().first.y() - points().second.y()));
-    drawObjectSelectionRect(painter, rect);
 }

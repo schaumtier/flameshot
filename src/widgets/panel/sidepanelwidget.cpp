@@ -8,8 +8,6 @@
 #include "src/utils/pathinfo.h"
 #include "utilitypanel.h"
 #include <QApplication>
-#include <QDebug> // TODO remove
-#include <QFormLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -23,22 +21,39 @@
 
 SidePanelWidget::SidePanelWidget(QPixmap* p, QWidget* parent)
   : QWidget(parent)
+  , m_layout(new QVBoxLayout(this))
   , m_pixmap(p)
 {
-    m_layout = new QVBoxLayout(this);
-    if (parent) {
+
+    if (parent != nullptr) {
         parent->installEventFilter(this);
     }
 
-    QFormLayout* colorForm = new QFormLayout();
-    m_thicknessSlider = new QSlider(Qt::Horizontal);
-    m_thicknessSlider->setRange(1, 100);
-    m_thicknessSlider->setValue(m_thickness);
+    auto* colorLayout = new QGridLayout();
+
+    // Create Active Tool Size
+    auto* activeToolSizeText = new QLabel(tr("Active tool size: "));
+
+    m_toolSizeSlider = new QSlider(Qt::Horizontal);
+    m_toolSizeSlider->setRange(1, maxToolSize);
+    m_toolSizeSlider->setValue(m_toolSize);
+    m_toolSizeSlider->setMinimumWidth(minSliderWidth);
+
+    colorLayout->addWidget(activeToolSizeText, 0, 0);
+    colorLayout->addWidget(m_toolSizeSlider, 1, 0);
+
+    // Create Active Color
+    auto* colorHBox = new QHBoxLayout();
+    auto* colorText = new QLabel(tr("Active Color: "));
+
     m_colorLabel = new QLabel();
     m_colorLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    colorForm->addRow(tr("Active thickness:"), m_thicknessSlider);
-    colorForm->addRow(tr("Active color:"), m_colorLabel);
-    m_layout->addLayout(colorForm);
+
+    colorHBox->addWidget(colorText);
+    colorHBox->addWidget(m_colorLabel);
+    colorLayout->addLayout(colorHBox, 2, 0);
+
+    m_layout->addLayout(colorLayout);
 
     m_colorWheel = new color_widgets::ColorWheel(this);
     m_colorWheel->setColor(m_color);
@@ -56,21 +71,21 @@ SidePanelWidget::SidePanelWidget(QPixmap* p, QWidget* parent)
     m_layout->addWidget(m_colorWheel);
     m_layout->addWidget(m_colorHex);
 
-    // thickness sigslots
-    connect(m_thicknessSlider,
-            &QSlider::sliderMoved,
+    // tool size sigslots
+    connect(m_toolSizeSlider,
+            &QSlider::valueChanged,
             this,
-            &SidePanelWidget::thicknessChanged);
+            &SidePanelWidget::toolSizeChanged);
     connect(this,
-            &SidePanelWidget::thicknessChanged,
+            &SidePanelWidget::toolSizeChanged,
             this,
-            &SidePanelWidget::updateThickness);
+            &SidePanelWidget::onToolSizeChanged);
     // color hex editor sigslots
     connect(m_colorHex, &QLineEdit::editingFinished, this, [=]() {
         if (!QColor::isValidColor(m_colorHex->text())) {
             m_colorHex->setText(m_color.name(QColor::HexRgb));
         } else {
-            updateColor(m_colorHex->text());
+            emit colorChanged(m_colorHex->text());
         }
     });
     // color grab button sigslots
@@ -79,34 +94,24 @@ SidePanelWidget::SidePanelWidget(QPixmap* p, QWidget* parent)
             this,
             &SidePanelWidget::startColorGrab);
     // color wheel sigslots
+    //   re-emit ColorWheel::colorSelected as SidePanelWidget::colorChanged
     connect(m_colorWheel,
-            &color_widgets::ColorWheel::mouseReleaseOnColor,
+            &color_widgets::ColorWheel::colorSelected,
             this,
             &SidePanelWidget::colorChanged);
-    connect(m_colorWheel,
-            &color_widgets::ColorWheel::colorChanged,
-            this,
-            &SidePanelWidget::updateColorNoWheel);
 }
 
-void SidePanelWidget::updateColor(const QColor& c)
+void SidePanelWidget::onColorChanged(const QColor& color)
 {
-    m_color = c;
-    updateColorNoWheel(c);
-    m_colorWheel->setColor(c);
+    m_color = color;
+    updateColorNoWheel(color);
+    m_colorWheel->setColor(color);
 }
 
-void SidePanelWidget::updateColorNoWheel(const QColor& c)
+void SidePanelWidget::onToolSizeChanged(int t)
 {
-    m_colorLabel->setStyleSheet(
-      QStringLiteral("QLabel { background-color : %1; }").arg(c.name()));
-    m_colorHex->setText(c.name(QColor::HexRgb));
-}
-
-void SidePanelWidget::updateThickness(const int& t)
-{
-    m_thickness = qBound(0, t, 100);
-    m_thicknessSlider->setValue(m_thickness);
+    m_toolSize = qBound(0, t, maxToolSize);
+    m_toolSizeSlider->setValue(m_toolSize);
 }
 
 void SidePanelWidget::startColorGrab()
@@ -116,7 +121,7 @@ void SidePanelWidget::startColorGrab()
     connect(m_colorGrabber,
             &ColorGrabWidget::colorUpdated,
             this,
-            &SidePanelWidget::onColorUpdated);
+            &SidePanelWidget::onTemporaryColorUpdated);
     connect(m_colorGrabber,
             &ColorGrabWidget::colorGrabbed,
             this,
@@ -141,10 +146,10 @@ void SidePanelWidget::onColorGrabAborted()
 {
     finalizeGrab();
     // Restore color that was selected before we started grabbing
-    updateColor(m_revertColor);
+    onColorChanged(m_revertColor);
 }
 
-void SidePanelWidget::onColorUpdated(const QColor& color)
+void SidePanelWidget::onTemporaryColorUpdated(const QColor& color)
 {
     updateColorNoWheel(color);
 }
@@ -152,6 +157,13 @@ void SidePanelWidget::onColorUpdated(const QColor& color)
 void SidePanelWidget::finalizeGrab()
 {
     emit togglePanel();
+}
+
+void SidePanelWidget::updateColorNoWheel(const QColor& c)
+{
+    m_colorLabel->setStyleSheet(
+      QStringLiteral("QLabel { background-color : %1; }").arg(c.name()));
+    m_colorHex->setText(c.name(QColor::HexRgb));
 }
 
 bool SidePanelWidget::eventFilter(QObject* obj, QEvent* event)

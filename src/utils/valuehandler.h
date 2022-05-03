@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/widgets/capture/capturetoolbutton.h"
+#include "src/widgets/colorpickerwidget.h"
 
 #include <QColor>
 #include <QList>
@@ -51,7 +52,7 @@ public:
      * `check`, the fallback will be returned. Otherwise the value is processed
      * by `process` and then returned.
      *
-     * @note Cannot be overriden
+     * @note Cannot be overridden
      * @see fallback, process
      */
     QVariant value(const QVariant& val);
@@ -60,7 +61,7 @@ public:
      */
     virtual QVariant fallback();
     /**
-     * @brief Return the representaion of the value in the config file.
+     * @brief Return the representation of the value in the config file.
      *
      * Override this if you want to write the value in a different format than
      * the one provided by `QVariant`.
@@ -98,7 +99,7 @@ private:
 class String : public ValueHandler
 {
 public:
-    String(const QString& def);
+    String(QString def);
     bool check(const QVariant&) override;
     QVariant fallback() override;
     QString expected() override;
@@ -110,7 +111,7 @@ private:
 class Color : public ValueHandler
 {
 public:
-    Color(const QColor& def);
+    Color(QColor def);
     bool check(const QVariant& val) override;
     QVariant process(const QVariant& val) override;
     QVariant fallback() override;
@@ -153,9 +154,12 @@ public:
     bool check(const QVariant& val) override;
     QVariant fallback() override;
     QString expected() override;
+    QVariant representation(const QVariant& val) override;
 
 private:
     QKeySequence m_fallback;
+
+    QVariant process(const QVariant& val) override;
 };
 
 class ExistingDir : public ValueHandler
@@ -183,15 +187,37 @@ public:
     QString expected() override;
 
     // UTILITY FUNCTIONS
-    static QList<CaptureToolButton::ButtonType> fromIntList(const QList<int>&);
-    static QList<int> toIntList(const QList<CaptureToolButton::ButtonType>& l);
+    static QList<CaptureTool::Type> fromIntList(const QList<int>&);
+    static QList<int> toIntList(const QList<CaptureTool::Type>& l);
     static bool normalizeButtons(QList<int>& buttons);
 };
 
 class UserColors : public ValueHandler
 {
+public:
+    UserColors(int min, int max);
     bool check(const QVariant& val) override;
     QVariant process(const QVariant& val) override;
     QVariant fallback() override;
     QString expected() override;
+    QVariant representation(const QVariant& val) override;
+
+private:
+    int m_min, m_max;
+};
+
+class SaveFileExtension : public ValueHandler
+{
+    bool check(const QVariant& val) override;
+    QVariant process(const QVariant& val) override;
+    QString expected() override;
+};
+
+class Region : public ValueHandler
+{
+public:
+    bool check(const QVariant& val) override;
+
+private:
+    QVariant process(const QVariant& val) override;
 };

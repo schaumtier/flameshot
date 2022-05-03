@@ -1,7 +1,12 @@
 #include "valuehandler.h"
+#include "capturetool.h"
+#include "colorpickerwidget.h"
 #include "confighandler.h"
+#include "screengrabber.h"
 #include <QColor>
 #include <QFileInfo>
+#include <QImageWriter>
+#include <QKeySequence>
 #include <QStandardPaths>
 #include <QVariant>
 
@@ -18,7 +23,7 @@ QVariant ValueHandler::value(const QVariant& val)
 
 QVariant ValueHandler::fallback()
 {
-    return QVariant();
+    return {};
 }
 
 QVariant ValueHandler::representation(const QVariant& val)
@@ -63,8 +68,8 @@ QString Bool::expected()
 
 // STRING
 
-String::String(const QString& def)
-  : m_def(def)
+String::String(QString def)
+  : m_def(std::move(def))
 {}
 
 bool String::check(const QVariant&)
@@ -84,8 +89,8 @@ QString String::expected()
 
 // COLOR
 
-Color::Color(const QColor& def)
-  : m_def(def)
+Color::Color(QColor def)
+  : m_def(std::move(def))
 {}
 
 bool Color::check(const QVariant& val)
@@ -150,7 +155,7 @@ bool BoundedInt::check(const QVariant& val)
     QString str = val.toString();
     bool conversionOk;
     int num = str.toInt(&conversionOk);
-    return conversionOk && (m_max < m_min || num <= m_max);
+    return conversionOk && m_min <= num && num <= m_max;
 }
 
 QVariant BoundedInt::fallback()
@@ -213,6 +218,24 @@ QString KeySequence::expected()
     return QStringLiteral("keyboard shortcut");
 }
 
+QVariant KeySequence::representation(const QVariant& val)
+{
+    QString str(val.toString());
+    if (QKeySequence(str) == QKeySequence(Qt::Key_Return)) {
+        return QStringLiteral("Enter");
+    }
+    return str;
+}
+
+QVariant KeySequence::process(const QVariant& val)
+{
+    QString str(val.toString());
+    if (str == "Enter") {
+        return QKeySequence(Qt::Key_Return).toString();
+    }
+    return str;
+}
+
 // EXISTING DIR
 
 bool ExistingDir::check(const QVariant& val)
@@ -267,15 +290,16 @@ QString FilenamePattern::expected()
 
 // BUTTON LIST
 
-using BType = CaptureToolButton::ButtonType;
-using BList = QList<BType>;
+using BType = CaptureTool::Type;
+using BList = QList<CaptureTool::Type>;
 
 bool ButtonList::check(const QVariant& val)
 {
+    // TODO stop using CTB
     using CTB = CaptureToolButton;
     auto allButtons = CTB::getIterableButtonTypes();
     for (int btn : val.value<QList<int>>()) {
-        if (!allButtons.contains(static_cast<CTB::ButtonType>(btn))) {
+        if (!allButtons.contains(static_cast<BType>(btn))) {
             return false;
         }
     }
@@ -293,7 +317,7 @@ void sortButtons(BList& buttons)
 
 QVariant ButtonList::process(const QVariant& val)
 {
-    QList<int> intButtons = val.value<QList<int>>();
+    auto intButtons = val.value<QList<int>>();
     auto buttons = ButtonList::fromIntList(intButtons);
     sortButtons(buttons);
     return QVariant::fromValue(buttons);
@@ -302,8 +326,8 @@ QVariant ButtonList::process(const QVariant& val)
 QVariant ButtonList::fallback()
 {
     auto buttons = CaptureToolButton::getIterableButtonTypes();
-    buttons.removeOne(CaptureToolButton::TYPE_SIZEDECREASE);
-    buttons.removeOne(CaptureToolButton::TYPE_SIZEINCREASE);
+    buttons.removeOne(CaptureTool::TYPE_SIZEDECREASE);
+    buttons.removeOne(CaptureTool::TYPE_SIZEINCREASE);
     sortButtons(buttons);
     return QVariant::fromValue(buttons);
 }
@@ -320,22 +344,23 @@ QString ButtonList::expected()
     return QStringLiteral("please don't edit by hand");
 }
 
-QList<CaptureToolButton::ButtonType> ButtonList::fromIntList(
-  const QList<int>& l)
+QList<CaptureTool::Type> ButtonList::fromIntList(const QList<int>& l)
 {
-    QList<CaptureToolButton::ButtonType> buttons;
+    QList<CaptureTool::Type> buttons;
     buttons.reserve(l.size());
-    for (auto const i : l)
-        buttons << static_cast<CaptureToolButton::ButtonType>(i);
+    for (auto const i : l) {
+        buttons << static_cast<CaptureTool::Type>(i);
+    }
     return buttons;
 }
 
-QList<int> ButtonList::toIntList(const QList<CaptureToolButton::ButtonType>& l)
+QList<int> ButtonList::toIntList(const QList<CaptureTool::Type>& l)
 {
     QList<int> buttons;
     buttons.reserve(l.size());
-    for (auto const i : l)
+    for (auto const i : l) {
         buttons << static_cast<int>(i);
+    }
     return buttons;
 }
 
@@ -356,10 +381,15 @@ bool ButtonList::normalizeButtons(QList<int>& buttons)
 
 // USER COLORS
 
+UserColors::UserColors(int min, int max)
+  : m_min(min)
+  , m_max(max)
+{}
+
 bool UserColors::check(const QVariant& val)
 {
     if (!val.isValid()) {
-        return true;
+        return false;
     }
     if (!val.canConvert(QVariant::StringList)) {
         return false;
@@ -369,7 +399,10 @@ bool UserColors::check(const QVariant& val)
             return false;
         }
     }
-    return true;
+
+    int sz = val.toStringList().size();
+
+    return sz >= m_min && sz <= m_max;
 }
 
 QVariant UserColors::process(const QVariant& val)
@@ -395,19 +428,137 @@ QVariant UserColors::process(const QVariant& val)
 
 QVariant UserColors::fallback()
 {
-    return QVariant::fromValue(QVector<QColor>{ Qt::darkRed,
-                                                Qt::red,
-                                                Qt::yellow,
-                                                Qt::green,
-                                                Qt::darkGreen,
-                                                Qt::cyan,
-                                                Qt::blue,
-                                                Qt::magenta,
-                                                Qt::darkMagenta,
-                                                QColor() });
+    if (ConfigHandler().predefinedColorPaletteLarge()) {
+        return QVariant::fromValue(
+          ColorPickerWidget::getDefaultLargeColorPalette());
+    } else {
+        return QVariant::fromValue(
+          ColorPickerWidget::getDefaultSmallColorPalette());
+    }
 }
 
 QString UserColors::expected()
 {
-    return QStringLiteral("list of colors separated by comma");
+    return QStringLiteral(
+             "list of colors(min %1 and max %2) separated by comma")
+      .arg(m_min - 1)
+      .arg(m_max - 1);
+}
+
+QVariant UserColors::representation(const QVariant& val)
+{
+    auto colors = val.value<QVector<QColor>>();
+
+    QStringList strColors;
+
+    for (const auto& col : colors) {
+        if (col.isValid()) {
+            strColors.append(col.name(QColor::HexRgb));
+        } else {
+            strColors.append(QStringLiteral("picker"));
+        }
+    }
+
+    return QVariant::fromValue(strColors);
+}
+
+// SET SAVE FILE AS EXTENSION
+
+bool SaveFileExtension::check(const QVariant& val)
+{
+    if (!val.canConvert(QVariant::String) || val.toString().isEmpty()) {
+        return false;
+    }
+
+    QString extension = val.toString();
+
+    if (extension.startsWith(".")) {
+        extension.remove(0, 1);
+    }
+
+    QStringList imageFormatList;
+    foreach (auto imageFormat, QImageWriter::supportedImageFormats())
+        imageFormatList.append(imageFormat);
+
+    if (!imageFormatList.contains(extension)) {
+        return false;
+    }
+
+    return true;
+}
+
+QVariant SaveFileExtension::process(const QVariant& val)
+{
+    QString extension = val.toString();
+
+    if (extension.startsWith(".")) {
+        extension.remove(0, 1);
+    }
+
+    return QVariant::fromValue(extension);
+}
+
+QString SaveFileExtension::expected()
+{
+    return QStringLiteral("supported image extension");
+}
+
+// REGION
+
+bool Region::check(const QVariant& val)
+{
+    QVariant region = process(val);
+    return process(val).isValid();
+}
+
+#include <QApplication> // TODO remove after FIXME (see below)
+#include <utility>
+
+QVariant Region::process(const QVariant& val)
+{
+    // FIXME: This is temporary, just before D-Bus is removed
+    char** argv = new char*[1];
+    int* argc = new int{ 0 };
+    if (QGuiApplication::screens().empty()) {
+        new QApplication(*argc, argv);
+    }
+
+    QString str = val.toString();
+
+    if (str == "all") {
+        return ScreenGrabber().desktopGeometry();
+    } else if (str.startsWith("screen")) {
+        bool ok;
+        int number = str.midRef(6).toInt(&ok);
+        if (!ok || number < 0) {
+            return {};
+        }
+        return ScreenGrabber().screenGeometry(qApp->screens()[number]);
+    }
+
+    QRegExp regex("(-{,1}\\d+)"   // number (any sign)
+                  "[x,\\.\\s]"    // separator ('x', ',', '.', or whitespace)
+                  "(-{,1}\\d+)"   // number (any sign)
+                  "[\\+,\\.\\s]*" // separator ('+',',', '.', or whitespace)
+                  "(-{,1}\\d+)"   // number (non-negative)
+                  "[\\+,\\.\\s]*" // separator ('+', ',', '.', or whitespace)
+                  "(-{,1}\\d+)"   // number (non-negative)
+    );
+
+    if (!regex.exactMatch(str)) {
+        return {};
+    }
+
+    int w, h, x, y;
+    bool w_ok, h_ok, x_ok, y_ok;
+    w = regex.cap(1).toInt(&w_ok);
+    h = regex.cap(2).toInt(&h_ok);
+    x = regex.cap(3).toInt(&x_ok);
+    y = regex.cap(4).toInt(&y_ok);
+
+    if (!(w_ok && h_ok && x_ok && y_ok)) {
+        return {};
+    }
+
+    return QRect(x, y, w, h).normalized();
 }

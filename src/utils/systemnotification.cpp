@@ -1,20 +1,22 @@
 #include "systemnotification.h"
-#include "src/core/controller.h"
+#include "src/core/flameshot.h"
 #include "src/utils/confighandler.h"
 #include <QApplication>
 #include <QUrl>
 
-#if not(defined(Q_OS_MACOS) || defined(Q_OS_WIN))
+#if !(defined(Q_OS_MACOS) || defined(Q_OS_WIN))
 #include <QDBusConnection>
 #include <QDBusInterface>
 #include <QDBusMessage>
+#else
+#include "src/core/flameshotdaemon.h"
 #endif
 
 SystemNotification::SystemNotification(QObject* parent)
   : QObject(parent)
   , m_interface(nullptr)
 {
-#if not(defined(Q_OS_MACOS) || defined(Q_OS_WIN))
+#if !(defined(Q_OS_MACOS) || defined(Q_OS_WIN))
     m_interface =
       new QDBusInterface(QStringLiteral("org.freedesktop.Notifications"),
                          QStringLiteral("/org/freedesktop/Notifications"),
@@ -40,7 +42,16 @@ void SystemNotification::sendMessage(const QString& text,
     }
 
 #if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
-    Controller::getInstance()->sendTrayNotification(text, title, timeout);
+    QMetaObject::invokeMethod(
+      this,
+      [&]() {
+          // The call is queued to avoid recursive static initialization of
+          // Flameshot and ConfigHandler.
+          if (FlameshotDaemon::instance())
+              FlameshotDaemon::instance()->sendTrayNotification(
+                text, title, timeout);
+      },
+      Qt::QueuedConnection);
 #else
     QList<QVariant> args;
     QVariantMap hintsMap;

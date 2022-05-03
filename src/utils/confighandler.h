@@ -9,11 +9,15 @@
 #include <QVariant>
 #include <QVector>
 
+#define CONFIG_GROUP_GENERAL "General"
+#define CONFIG_GROUP_SHORTCUTS "Shortcuts"
+
 class QFileSystemWatcher;
 class ValueHandler;
 template<class T>
 class QSharedPointer;
 class QTextStream;
+class AbstractLogger;
 
 /**
  * Declare and implement a getter for a config option. `KEY` is the option key
@@ -29,9 +33,14 @@ class QTextStream;
  * and `TYPE` is the C++ type.
  */
 #define CONFIG_SETTER(FUNC, KEY, TYPE)                                         \
-    void FUNC(const TYPE& value)                                               \
+    void FUNC(const TYPE& val)                                                 \
     {                                                                          \
-        setValue(QStringLiteral(#KEY), QVariant::fromValue(value));            \
+        QString key = QStringLiteral(#KEY);                                    \
+        /* Without this check, multiple `flameshot gui` instances running */   \
+        /* simultaneously would cause an endless loop of fileWatcher calls */  \
+        if (QVariant::fromValue(val) != value(key)) {                          \
+            setValue(key, QVariant::fromValue(val));                           \
+        }                                                                      \
     }
 
 /**
@@ -49,7 +58,7 @@ class ConfigHandler : public QObject
     Q_OBJECT
 
 public:
-    explicit ConfigHandler(bool skipInitialErrorCheck = false);
+    explicit ConfigHandler();
 
     static ConfigHandler* getInstance();
 
@@ -63,6 +72,9 @@ public:
     CONFIG_GETTER_SETTER(uiColor, setUiColor, QColor)
     CONFIG_GETTER_SETTER(contrastUiColor, setContrastUiColor, QColor)
     CONFIG_GETTER_SETTER(drawColor, setDrawColor, QColor)
+    CONFIG_GETTER_SETTER(predefinedColorPaletteLarge,
+                         setPredefinedColorPaletteLarge,
+                         bool)
     CONFIG_GETTER_SETTER(fontFamily, setFontFamily, QString)
     CONFIG_GETTER_SETTER(showHelp, setShowHelp, bool)
     CONFIG_GETTER_SETTER(showSidePanelButton, setShowSidePanelButton, bool)
@@ -75,6 +87,10 @@ public:
     CONFIG_GETTER_SETTER(drawFontSize, setDrawFontSize, int)
     CONFIG_GETTER_SETTER(keepOpenAppLauncher, setKeepOpenAppLauncher, bool)
     CONFIG_GETTER_SETTER(checkForUpdates, setCheckForUpdates, bool)
+    CONFIG_GETTER_SETTER(allowMultipleGuiInstances,
+                         setAllowMultipleGuiInstances,
+                         bool)
+    CONFIG_GETTER_SETTER(autoCloseIdleDaemon, setAutoCloseIdleDaemon, bool)
     CONFIG_GETTER_SETTER(showStartupLaunchMessage,
                          setShowStartupLaunchMessage,
                          bool)
@@ -88,21 +104,28 @@ public:
     CONFIG_GETTER_SETTER(uploadHistoryMax, setUploadHistoryMax, int)
     CONFIG_GETTER_SETTER(saveAfterCopy, setSaveAfterCopy, bool)
     CONFIG_GETTER_SETTER(copyPathAfterSave, setCopyPathAfterSave, bool)
+    CONFIG_GETTER_SETTER(saveAsFileExtension, setSaveAsFileExtension, QString)
+    CONFIG_GETTER_SETTER(antialiasingPinZoom, setAntialiasingPinZoom, bool)
     CONFIG_GETTER_SETTER(useJpgForClipboard, setUseJpgForClipboard, bool)
+    CONFIG_GETTER_SETTER(uploadWithoutConfirmation,
+                         setUploadWithoutConfirmation,
+                         bool)
     CONFIG_GETTER_SETTER(ignoreUpdateToVersion,
                          setIgnoreUpdateToVersion,
                          QString)
     CONFIG_GETTER_SETTER(undoLimit, setUndoLimit, int)
-    CONFIG_GETTER_SETTER(buttons,
-                         setButtons,
-                         QList<CaptureToolButton::ButtonType>)
+    CONFIG_GETTER_SETTER(buttons, setButtons, QList<CaptureTool::Type>)
+    CONFIG_GETTER_SETTER(showMagnifier, setShowMagnifier, bool)
+    CONFIG_GETTER_SETTER(squareMagnifier, setSquareMagnifier, bool)
+    CONFIG_GETTER_SETTER(copyOnDoubleClick, setCopyOnDoubleClick, bool)
+    CONFIG_GETTER_SETTER(uploadClientSecret, setUploadClientSecret, QString)
 
     // SPECIAL CASES
     bool startupLaunch();
     void setStartupLaunch(const bool);
-    QString saveAsFileExtension();
-    CONFIG_SETTER(setSaveAsFileExtension, setSaveAsFileExtension, QString)
     void setAllTheButtons();
+    void setToolSize(CaptureTool::Type toolType, int size);
+    int toolSize(CaptureTool::Type toolType);
 
     // DEFAULTS
     QString filenamePatternDefault();
@@ -110,21 +133,25 @@ public:
     QString configFilePath() const;
 
     // GENERIC GETTERS AND SETTERS
-    bool setShortcut(const QString&, const QString&);
-    QString shortcut(const QString&);
+    bool setShortcut(const QString& actionName, const QString& shortcut);
+    QString shortcut(const QString& actionName);
     void setValue(const QString& key, const QVariant& value);
     QVariant value(const QString& key) const;
+    void remove(const QString& key);
+    void resetValue(const QString& key);
 
     // INFO
-    const QSet<QString>& recognizedGeneralOptions() const;
-    const QSet<QString>& recognizedShortcutNames() const;
+    static QSet<QString>& recognizedGeneralOptions();
+    static QSet<QString>& recognizedShortcutNames();
     QSet<QString> keysFromGroup(const QString& group) const;
 
     // ERROR HANDLING
-    bool checkForErrors(QTextStream* log = nullptr) const;
-    bool checkUnrecognizedSettings(QTextStream* log = nullptr) const;
-    bool checkShortcutConflicts(QTextStream* log = nullptr) const;
-    bool checkSemantics(QTextStream* log = nullptr) const;
+    bool checkForErrors(AbstractLogger* log = nullptr) const;
+    bool checkUnrecognizedSettings(AbstractLogger* log = nullptr,
+                                   QList<QString>* offenders = nullptr) const;
+    bool checkShortcutConflicts(AbstractLogger* log = nullptr) const;
+    bool checkSemantics(AbstractLogger* log = nullptr,
+                        QList<QString>* offenders = nullptr) const;
     void checkAndHandleError() const;
     void setErrorState(bool error) const;
     bool hasError() const;
@@ -146,4 +173,5 @@ private:
     void assertKeyRecognized(const QString& key) const;
     bool isShortcut(const QString& key) const;
     QString baseName(QString key) const;
+    void cleanUnusedKeys(const QString& group, const QSet<QString>& keys) const;
 };
