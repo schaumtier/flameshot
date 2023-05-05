@@ -58,8 +58,6 @@
 
 ... added a `Dockerfile` and a build-script `build.sh` to build without installing dependencies (currently works only on Linux)
 
-❗ Attention: it seems to be broken in Gnome 42 ❗
-
 ## Preview
 
 ![image](https://raw.githubusercontent.com/flameshot-org/flameshot/master/data/img/preview/animatedUsage.gif)
