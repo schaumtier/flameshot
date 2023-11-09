@@ -3,6 +3,8 @@ BUILDER=$(docker images -f reference=$IMAGE_NAME --format {{.ID}})
 
 if [[ "$1" == "help" || "$1" == "--help" || "$1" == "-h" ]]; then
     echo
+    echo "builds flameshot with docker image"
+    echo
     echo "[Options]"
     echo
     echo "   image   - rebuilds the docker image"

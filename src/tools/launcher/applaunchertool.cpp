@@ -35,7 +35,7 @@ CaptureTool::Type AppLauncher::type() const
 
 QString AppLauncher::description() const
 {
-    return tr("Choose an app to open the capture");
+    return tr("Open with eog");
 }
 
 QWidget* AppLauncher::widget()
@@ -53,12 +53,15 @@ void AppLauncher::pressed(CaptureContext& context)
     capture = context.selectedScreenshotArea();
     emit requestAction(REQ_CAPTURE_DONE_OK);
     // emit requestAction(REQ_ADD_EXTERNAL_WIDGETS);
-    // emit requestAction(REQ_CLOSE_GUI);
+
+    // close immediately after open "eog" - not sure if this is 100% correct...
+    emit requestAction(REQ_CLOSE_GUI);
 
     QString m_tempFile;
     if (!QFileInfo(m_tempFile).isReadable()) {
         m_tempFile =
           FileNameHandler().properScreenshotPath(QDir::tempPath(), "png");
+        //   FileNameHandler().properScreenshotPath(QDir::homePath() + "/Data/Eimer/.tmp", "png");
         capture.save(m_tempFile);
     }
     
