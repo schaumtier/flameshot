@@ -3,6 +3,7 @@
 
 #include "selectiontool.h"
 #include <QPainter>
+#include <QPainterPath>
 
 SelectionTool::SelectionTool(QObject* parent)
   : AbstractTwoPointTool(parent)

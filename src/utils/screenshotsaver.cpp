@@ -14,6 +14,8 @@
 #include <KSystemClipboard>
 #endif
 
+#include <QProcess>
+
 #include <QApplication>
 #include <QBuffer>
 #include <QClipboard>
@@ -29,7 +31,8 @@
 
 bool saveToFilesystem(const QPixmap& capture,
                       const QString& path,
-                      const QString& messagePrefix)
+                      const QString& messagePrefix,
+                      bool notification)
 {
     QString completePath = FileNameHandler().properScreenshotPath(
       path, ConfigHandler().saveAsFileExtension());
@@ -43,9 +46,11 @@ bool saveToFilesystem(const QPixmap& capture,
     }
 
     if (okay) {
-        saveMessage += QObject::tr("Capture saved as ") + completePath;
-        AbstractLogger::info().attachNotificationPath(notificationPath)
-          << saveMessage;
+        if(notification){
+            saveMessage += QObject::tr("Capture saved as ") + completePath;
+            AbstractLogger::info().attachNotificationPath(notificationPath)
+              << saveMessage;
+        }
     } else {
         saveMessage += QObject::tr("Error trying to save as ") + completePath;
         if (file.error() != QFile::NoError) {
@@ -107,11 +112,22 @@ void saveToClipboardMime(const QPixmap& capture, const QString& imageType)
         auto* mimeData = new QMimeData();
 
 #ifdef USE_WAYLAND_CLIPBOARD
-        mimeData->setImageData(formattedPixmap.toImage());
-        mimeData->setData(QStringLiteral("x-kde-force-image-copy"),
-                          QByteArray());
-        KSystemClipboard::instance()->setMimeData(mimeData,
-                                                  QClipboard::Clipboard);
+
+        /*
+         * der folgende Copde geht gerade nicht (mit Gnome 49) - irgendwas muss wohl jetzt grundlegend anders gemacht werden
+         */
+
+        // mimeData->setImageData(formattedPixmap.toImage());
+        // mimeData->setData(QStringLiteral("x-kde-force-image-copy"),
+        //                   QByteArray());
+        // KSystemClipboard::instance()->setMimeData(mimeData,
+        //                                           QClipboard::Clipboard);
+
+        /*
+         * Workarround: Speichern und per wl-copy ins Clipboard laden
+         */
+        saveToFilesystem(capture, "/tmp/tmpsc.png", "", false);
+        QProcess::startDetached("/bin/bash", QStringList() << "-c" << "wl-copy < /tmp/tmpsc.png && rm -f /tmp/tmpsc.png");
 #else
         mimeData->setData("image/" + imageType, array);
         QApplication::clipboard()->setMimeData(mimeData);

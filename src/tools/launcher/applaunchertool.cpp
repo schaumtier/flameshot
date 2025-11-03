@@ -35,7 +35,8 @@ CaptureTool::Type AppLauncher::type() const
 
 QString AppLauncher::description() const
 {
-    return tr("Open with eog");
+    // return tr("Open with eog");
+    return tr("Open with loupe");
 }
 
 QWidget* AppLauncher::widget()
@@ -65,5 +66,6 @@ void AppLauncher::pressed(CaptureContext& context)
         capture.save(m_tempFile);
     }
     
-    QProcess::startDetached("eog", { m_tempFile });
+    // QProcess::startDetached("eog", { m_tempFile });
+    QProcess::startDetached("loupe", { m_tempFile });
 }

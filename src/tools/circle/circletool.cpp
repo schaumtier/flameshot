@@ -3,6 +3,7 @@
 
 #include "circletool.h"
 #include <QPainter>
+#include <QPainterPath>
 
 CircleTool::CircleTool(QObject* parent)
   : AbstractTwoPointTool(parent)

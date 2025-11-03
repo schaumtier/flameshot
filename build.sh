@@ -7,7 +7,7 @@ if [[ "$1" == "help" || "$1" == "--help" || "$1" == "-h" ]]; then
     echo
     echo "[Options]"
     echo
-    echo "   image   - rebuilds the docker image"
+    echo "   image   - rebuilds the docker image and then rebuilds the source code"
     echo "   rebuild - rebuilds the source code (deletes old build)"
     echo
     exit 0
