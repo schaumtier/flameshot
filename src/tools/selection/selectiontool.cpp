@@ -3,6 +3,7 @@
 
 #include "selectiontool.h"
 #include <QPainter>
+#include <QPainterPath>
 
 SelectionTool::SelectionTool(QObject* parent)
   : AbstractTwoPointTool(parent)
@@ -45,9 +46,23 @@ CaptureTool* SelectionTool::copy(QObject* parent)
 void SelectionTool::process(QPainter& painter, const QPixmap& pixmap)
 {
     Q_UNUSED(pixmap)
-    painter.setPen(
-      QPen(color(), size(), Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
-    painter.drawRect(QRect(points().first, points().second));
+    // painter.setPen(
+    //   QPen(color(), size(), Qt::SolidLine, Qt::SquareCap, Qt::MiterJoin));
+    // painter.drawRect(QRect(points().first, points().second));
+
+    // ++ Fill with Alpha ++                                                                                                                                                                       
+    QColor borderColor = QColor(color());
+    borderColor.setAlpha(100);
+
+    QColor fillColor = QColor(color());
+    fillColor.setAlpha(20);
+
+    QPainterPath path;
+    path.addRoundedRect(QRect(points().first, points().second), 4, 4);
+    QPen pen(borderColor, size());
+    painter.setPen(pen);
+    painter.fillPath(path, fillColor);
+    painter.drawPath(path);
 }
 
 void SelectionTool::pressed(CaptureContext& context)

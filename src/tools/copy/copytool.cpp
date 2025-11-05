@@ -41,8 +41,17 @@ CaptureTool* CopyTool::copy(QObject* parent)
 
 void CopyTool::pressed(CaptureContext& context)
 {
-    emit requestAction(REQ_CLEAR_SELECTION);
-    context.request.addTask(CaptureRequest::COPY);
+    /*
+     * aus irgendeinem Grund geht der originale Code nicht (mehr) - ich muss jetzt Clipboard direkt aufrufen
+     */    
+    // emit requestAction(REQ_CLEAR_SELECTION);
+    // context.request.addTask(CaptureRequest::COPY);
+    // emit requestAction(REQ_CAPTURE_DONE_OK);
+    // emit requestAction(REQ_CLOSE_GUI);
+
+    QPixmap capture = context.selectedScreenshotArea();
     emit requestAction(REQ_CAPTURE_DONE_OK);
     emit requestAction(REQ_CLOSE_GUI);
+
+    saveToClipboard(capture);
 }

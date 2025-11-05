@@ -3,6 +3,7 @@
 
 #include "circletool.h"
 #include <QPainter>
+#include <QPainterPath>
 
 CircleTool::CircleTool(QObject* parent)
   : AbstractTwoPointTool(parent)
@@ -40,8 +41,22 @@ CaptureTool* CircleTool::copy(QObject* parent)
 void CircleTool::process(QPainter& painter, const QPixmap& pixmap)
 {
     Q_UNUSED(pixmap)
-    painter.setPen(QPen(color(), size()));
-    painter.drawEllipse(QRect(points().first, points().second));
+    // painter.setPen(QPen(color(), size()));
+    // painter.drawEllipse(QRect(points().first, points().second));
+
+    // ++ Fill with Alpha ++                                                                                                                                                                       
+    QColor borderColor = QColor(color());
+    borderColor.setAlpha(100);
+
+    QColor fillColor = QColor(color());
+    fillColor.setAlpha(20);
+
+    QPainterPath path;
+    path.addEllipse(QRect(points().first, points().second));
+    QPen pen(borderColor, size());
+    painter.setPen(pen);
+    painter.fillPath(path, fillColor);
+    painter.drawPath(path);
 }
 
 void CircleTool::pressed(CaptureContext& context)
