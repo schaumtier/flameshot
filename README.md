@@ -47,7 +47,18 @@
   </p>
 </div>
 
+## About This Fork
 
+... contains some personal changes like
+* rounded corners on selection
+* filled area with alpha in selection
+* filled area with alpha in circle
+* on "Choose an app to open the capture" directly open "loupe" instead of choosing an app
+
+... contains a workarround for "copy to clipboard" on Ubuntu / Gnome 49 / Wayland 
+
+... added a `Dockerfile` and a build-script `build.sh` to build without installing dependencies (currently works only on Linux)
+(run "build.sh" to build and execute the docker-image)
 
 ## Preview
 
