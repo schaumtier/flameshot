@@ -1,8 +1,3 @@
-##
-## ACHTUNG:
-##   aktuell ist die App auf Qt6 => wenn ich also mal den Code erneuere, muss ich ein anderes Basis-Image nutzen und andere Packages installieren
-##
-
 FROM debian:trixie
 
 RUN apt update && apt install -y g++ cmake build-essential git openssl ca-certificates \
